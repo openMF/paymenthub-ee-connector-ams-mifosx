@@ -3,7 +3,7 @@ version: 2.1
 # Master CircleCI config template for PHEE Java components.
 # Distributed to all repos by java_version_config_updater.py.
 # Template variables substituted by the script:
-#   cimg/openjdk:17.0.17  - e.g. cimg/openjdk:17.0
+#   cimg/openjdk:21.0.6  - e.g. cimg/openjdk:21.0
 #   ./gradlew checkstyleMain         - ./gradlew checkstyleMain (present or commented out)
 
 executors:
@@ -13,7 +13,7 @@ executors:
     # The executor JDK is only used to compile the JAR — the final Docker
     # image base is set independently in each repo's Dockerfile.
     docker:
-      - image: cimg/openjdk:17.0.17
+      - image: cimg/openjdk:21.0.6
     environment:
       JVM_OPTS: -Xmx512m
       TERM: dumb
