@@ -1,0 +1,24 @@
+ams:
+  local:
+    interop:
+      host: http://mifos.mifos.gazelle.test
+    customer:
+      host: http://mifos.mifos.gazelle.test
+    account:
+      host: http://mifos.mifos.gazelle.test
+    auth:
+      host: http://mifos.mifos.gazelle.test
+    tenants:
+      - name: "greenbank"
+        user: mifos
+        password: password
+        authtype: basic
+        fspId: payerfsp
+      - name: "bluebank"
+        user: mifos
+        password: password
+        authtype: basic
+        fspId: payerfsp
+
+# Savings : S , Loan : L
+accountPrefixes: "S,L"
