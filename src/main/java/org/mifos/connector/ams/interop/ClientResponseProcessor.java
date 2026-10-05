@@ -14,6 +14,7 @@ import java.util.Map;
 import org.apache.camel.Exchange;
 import org.apache.camel.Processor;
 import org.mifos.connector.ams.errorhandler.ErrorTranslator;
+import org.mifos.connector.ams.properties.AmsLocalProperties;
 import org.mifos.connector.ams.properties.TenantProperties;
 import org.mifos.connector.ams.utils.Utils;
 import org.mifos.connector.common.ams.dto.ClientData;
@@ -28,7 +29,6 @@ import org.mifos.connector.common.mojaloop.type.IdentifierType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -37,8 +37,8 @@ public class ClientResponseProcessor implements Processor {
 
     private Logger logger = LoggerFactory.getLogger(this.getClass());
 
-    @Value("${ams.local.version}")
-    private String amsVersion;
+    @Autowired
+    private AmsLocalProperties amsLocalProperties;
 
     @Autowired
     private TenantProperties tenantProperties;
@@ -67,7 +67,7 @@ public class ClientResponseProcessor implements Processor {
             Party mojaloopParty = new Party(new PartyIdInfo(IdentifierType.valueOf(partyIdType), partyId, null,
                     tenantProperties.getTenant(exchange.getProperty(TENANT_ID, String.class)).getFspId()), null, null, null);
 
-            if ("1.2".equals(amsVersion)) {
+            if ("1.2".equals(amsLocalProperties.version())) {
                 ClientData client = exchange.getIn().getBody(ClientData.class);
                 EnumOptionData legalForm = client.getLegalForm();
                 if (legalForm == null

@@ -9,12 +9,12 @@ import org.apache.camel.LoggingLevel;
 import org.apache.camel.builder.RouteBuilder;
 import org.apache.camel.model.dataformat.JsonLibrary;
 import org.json.JSONObject;
+import org.mifos.connector.ams.properties.AmsLocalProperties;
 import org.mifos.connector.common.ams.dto.ClientData;
 import org.mifos.connector.common.ams.dto.Customer;
 import org.mifos.connector.common.ams.dto.InteropAccountDTO;
 import org.mifos.connector.common.ams.dto.ProductInstance;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -22,8 +22,8 @@ public class AccountsRouteBuilder extends RouteBuilder {
 
     @Autowired(required = false)
     private AmsService amsService;
-    @Value("${ams.local.version}")
-    private String amsVersion;
+    @Autowired
+    private AmsLocalProperties amsLocalProperties;
 
     @Override
     public void configure() {
@@ -64,7 +64,7 @@ public class AccountsRouteBuilder extends RouteBuilder {
                 .to("direct:get-external-account")
                 .process(amsService::getSavingsAccount)
                 .choice()
-                    .when(e -> "1.2".equals(amsVersion))
+                    .when(e -> "1.2".equals(amsLocalProperties.version()))
                         .unmarshal().json(JsonLibrary.Jackson, InteropAccountDTO.class)
                         .process(e -> e.setProperty(CLIENT_ID, e.getIn().getBody(InteropAccountDTO.class).getClientId()))
                         .process(amsService::getClientImage)

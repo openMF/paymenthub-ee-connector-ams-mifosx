@@ -16,10 +16,10 @@ import java.util.HashMap;
 import java.util.Map;
 import org.apache.camel.Exchange;
 import org.apache.camel.Processor;
+import org.mifos.connector.ams.properties.AmsLocalProperties;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -28,8 +28,8 @@ public class InteropPartyResponseProcessor implements Processor {
 
     private Logger logger = LoggerFactory.getLogger(this.getClass());
 
-    @Value("${ams.local.version}")
-    private String amsVersion;
+    @Autowired
+    private AmsLocalProperties amsLocalProperties;
 
     @Autowired(required = false)
     private ZeebeClient zeebeClient;

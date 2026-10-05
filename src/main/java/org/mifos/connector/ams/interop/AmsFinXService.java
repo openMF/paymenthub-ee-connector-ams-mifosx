@@ -16,25 +16,12 @@ import org.mifos.connector.ams.tenant.TenantService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
 import org.springframework.stereotype.Component;
 
 @Component
 @ConditionalOnExpression("'${ams.local.version}'.equals('1.2')")
 public class AmsFinXService extends AmsCommonService implements AmsService {
-
-    @Value("${ams.local.interop.accounts-path}")
-    private String amsInteropAccountsPath;
-
-    @Value("${ams.local.customer.path}")
-    private String amsClientsPath;
-
-    @Value("${ams.local.customer.image}")
-    private String amsImagePath;
-
-    @Value("${ams.local.account.savingsaccounts-path}")
-    private String amsSavingsAccountsPath;
 
     @Autowired
     private TenantService tenantService;
@@ -48,7 +35,8 @@ public class AmsFinXService extends AmsCommonService implements AmsService {
         Map<String, Object> headers = new HashMap<>();
         headers.put(CXF_TRACE_HEADER, true);
         headers.put(HTTP_METHOD, "GET");
-        headers.put(HTTP_PATH, amsInteropAccountsPath.replace("{externalAccountId}", e.getProperty(EXTERNAL_ACCOUNT_ID, String.class)));
+        headers.put(HTTP_PATH, amsLocalProperties.interop().accountsPath().replace("{externalAccountId}",
+                e.getProperty(EXTERNAL_ACCOUNT_ID, String.class)));
         headers.putAll(tenantService.getHeaders(e.getProperty(TENANT_ID, String.class)));
         cxfrsUtil.sendInOut("cxfrs:bean:ams.local.interop", e, headers, null);
     }
@@ -61,7 +49,7 @@ public class AmsFinXService extends AmsCommonService implements AmsService {
         Map<String, Object> headers = new HashMap<>();
         headers.put(CXF_TRACE_HEADER, true);
         headers.put(HTTP_METHOD, "GET");
-        headers.put(HTTP_PATH, amsSavingsAccountsPath);
+        headers.put(HTTP_PATH, amsLocalProperties.account().savingsaccountsPath());
         headers.putAll(tenantService.getHeaders(e.getProperty(TENANT_ID, String.class)));
         cxfrsUtil.sendInOut("cxfrs:bean:ams.local.account", e, headers, null);
     }
@@ -70,8 +58,8 @@ public class AmsFinXService extends AmsCommonService implements AmsService {
         Map<String, Object> headers = new HashMap<>();
         headers.put(CXF_TRACE_HEADER, true);
         headers.put(HTTP_METHOD, "GET");
-        headers.put(HTTP_PATH,
-                amsInteropAccountsPath.replace("{externalAccountId}", e.getProperty(EXTERNAL_ACCOUNT_ID, String.class) + "/transactions"));
+        headers.put(HTTP_PATH, amsLocalProperties.interop().accountsPath().replace("{externalAccountId}",
+                e.getProperty(EXTERNAL_ACCOUNT_ID, String.class) + "/transactions"));
         headers.putAll(tenantService.getHeaders(e.getProperty(TENANT_ID, String.class)));
         cxfrsUtil.sendInOut("cxfrs:bean:ams.local.account", e, headers, null);
     }
@@ -80,7 +68,7 @@ public class AmsFinXService extends AmsCommonService implements AmsService {
         Map<String, Object> headers = new HashMap<>();
         headers.put(CXF_TRACE_HEADER, true);
         headers.put(HTTP_METHOD, "GET");
-        headers.put(HTTP_PATH, amsClientsPath.replace("{clientId}", e.getProperty(CLIENT_ID, String.class)));
+        headers.put(HTTP_PATH, amsLocalProperties.customer().path().replace("{clientId}", e.getProperty(CLIENT_ID, String.class)));
         headers.putAll(tenantService.getHeaders(e.getProperty(TENANT_ID, String.class)));
         cxfrsUtil.sendInOut("cxfrs:bean:ams.local.customer", e, headers, null);
     }
@@ -89,7 +77,7 @@ public class AmsFinXService extends AmsCommonService implements AmsService {
         Map<String, Object> headers = new HashMap<>();
         headers.put(CXF_TRACE_HEADER, true);
         headers.put(HTTP_METHOD, "GET");
-        headers.put(HTTP_PATH, amsImagePath.replace("{clientId}", e.getProperty(CLIENT_ID, String.class)));
+        headers.put(HTTP_PATH, amsLocalProperties.customer().image().replace("{clientId}", e.getProperty(CLIENT_ID, String.class)));
         headers.putAll(tenantService.getHeaders(e.getProperty(TENANT_ID, String.class)));
         cxfrsUtil.sendInOut("cxfrs:bean:ams.local.customer.image", e, headers, null);
     }
@@ -99,7 +87,7 @@ public class AmsFinXService extends AmsCommonService implements AmsService {
         Map<String, Object> headers = new HashMap<>();
         headers.put(CXF_TRACE_HEADER, true);
         headers.put(HTTP_METHOD, "GET");
-        String path = amsClientsPath.replace("/{clientId}", "");
+        String path = amsLocalProperties.customer().path().replace("/{clientId}", "");
         path += "?mobileNo=" + e.getProperty(IDENTIFIER_ID, String.class);
         headers.put(HTTP_PATH, path);
         headers.putAll(tenantService.getHeaders(e.getProperty(TENANT_ID, String.class)));

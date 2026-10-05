@@ -6,12 +6,17 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import org.apache.camel.Processor;
+import org.mifos.connector.ams.properties.AmsLocalProperties;
+import org.mifos.connector.ams.properties.MockServiceProperties;
+import org.mifos.connector.ams.properties.ZeebeProperties;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.web.client.RestTemplate;
 
 @SpringBootApplication
+@EnableConfigurationProperties({ AmsLocalProperties.class, MockServiceProperties.class, ZeebeProperties.class })
 public class AmsConnectorApplication {
 
     public static void main(String[] args) {

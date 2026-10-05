@@ -16,11 +16,12 @@ import java.util.Map;
 import org.apache.camel.Exchange;
 import org.apache.camel.component.cxf.common.message.CxfConstants;
 import org.mifos.connector.ams.camel.cxfrs.CxfrsUtil;
+import org.mifos.connector.ams.properties.AmsLocalProperties;
+import org.mifos.connector.ams.properties.MockServiceProperties;
 import org.mifos.connector.ams.tenant.TenantService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
@@ -29,17 +30,11 @@ import org.springframework.web.client.RestTemplate;
 // @ConditionalOnExpression("${ams.local.enabled}")
 public class AmsCommonService {
 
-    @Value("${ams.local.interop.quotes-path}")
-    private String amsInteropQuotesPath;
+    @Autowired
+    protected AmsLocalProperties amsLocalProperties;
 
-    @Value("${ams.local.interop.parties-path}")
-    private String amsInteropPartiesPath;
-
-    @Value("${ams.local.interop.transfers-path}")
-    private String amsInteropTransfersPath;
-
-    @Value("${ams.local.loan.repayment-path}")
-    private String amsLoanRepaymentPath;
+    @Autowired
+    protected MockServiceProperties mockServiceProperties;
 
     @Autowired
     private TenantService tenantService;
@@ -49,16 +44,6 @@ public class AmsCommonService {
     @Autowired
     RestTemplate restTemplate;
 
-    @Value("${ams.local.enabled}")
-    private boolean isAmsLocalEnabled;
-
-    @Value("${mock-service.local.loan.repayment-path}")
-    private String mockServiceLoanRepaymentPath;
-    @Value("${mock-service.local.interop.transfers-path}")
-    private String mockServiceInteropTransfersPath;
-    @Value("${mock-service.local.interop.parties-path}")
-    private String mockServiceAmsInteropPartiesPath;
-
     private Logger logger = LoggerFactory.getLogger(this.getClass());
 
     private static final String APPLICATION_TYPE = "application/json";
@@ -67,7 +52,7 @@ public class AmsCommonService {
         Map<String, Object> headers = new HashMap<>();
         headers.put(CXF_TRACE_HEADER, true);
         headers.put(HTTP_METHOD, "POST");
-        headers.put(HTTP_PATH, amsInteropQuotesPath);
+        headers.put(HTTP_PATH, amsLocalProperties.interop().quotesPath());
         headers.put("Content-Type", "application/json");
         headers.putAll(tenantService.getHeaders(e.getProperty(TENANT_ID, String.class)));
         cxfrsUtil.sendInOut("cxfrs:bean:ams.local.interop", e, headers, e.getIn().getBody());
@@ -77,14 +62,14 @@ public class AmsCommonService {
         Map<String, Object> headers = new HashMap<>();
         headers.put(CXF_TRACE_HEADER, true);
         headers.put(HTTP_METHOD, "GET");
-        headers.put(HTTP_PATH, amsInteropPartiesPath.replace("{idType}", e.getProperty(PARTY_ID_TYPE, String.class)).replace("{idValue}",
-                e.getProperty(PARTY_ID, String.class)));
+        headers.put(HTTP_PATH, amsLocalProperties.interop().partiesPath().replace("{idType}", e.getProperty(PARTY_ID_TYPE, String.class))
+                .replace("{idValue}", e.getProperty(PARTY_ID, String.class)));
         headers.putAll(tenantService.getHeaders(e.getProperty(TENANT_ID, String.class)));
-        if (isAmsLocalEnabled) {
+        if (amsLocalProperties.enabled()) {
             cxfrsUtil.sendInOut("cxfrs:bean:ams.local.interop", e, headers, null);
         } else {
             logger.info("-------------- Calling Mock external Account API --------------");
-            headers.put(HTTP_PATH, mockServiceAmsInteropPartiesPath);
+            headers.put(HTTP_PATH, mockServiceProperties.interop().partiesPath());
             cxfrsUtil.sendInOut("cxfrs:bean:mock-service.local.interop", e, headers, null);
         }
         // cxfrsUtil.sendInOut("cxfrs:bean:ams.local.interop", e, headers, null);
@@ -94,18 +79,18 @@ public class AmsCommonService {
         Map<String, Object> headers = new HashMap<>();
         headers.put(CXF_TRACE_HEADER, true);
         headers.put(HTTP_METHOD, "POST");
-        headers.put(HTTP_PATH, amsInteropTransfersPath);
+        headers.put(HTTP_PATH, amsLocalProperties.interop().transfersPath());
         logger.info("Send Transfer Body: {}", e.getIn().getBody());
         Map<String, String> queryMap = new LinkedHashMap<>();
         queryMap.put("action", e.getProperty(TRANSFER_ACTION, String.class));
         headers.put(CxfConstants.CAMEL_CXF_RS_QUERY_MAP, queryMap);
         headers.put("Content-Type", "application/json");
         headers.putAll(tenantService.getHeaders(e.getProperty(TENANT_ID, String.class)));
-        if (isAmsLocalEnabled) {
+        if (amsLocalProperties.enabled()) {
             cxfrsUtil.sendInOut("cxfrs:bean:ams.local.interop", e, headers, e.getIn().getBody());
         } else {
             logger.info("-------------- Calling Mock transfers APIs --------------");
-            headers.put(HTTP_PATH, mockServiceInteropTransfersPath);
+            headers.put(HTTP_PATH, mockServiceProperties.interop().transfersPath());
             cxfrsUtil.sendInOut("cxfrs:bean:mock-service.local.interop", e, headers, e.getIn().getBody().toString());
         }
     }
@@ -114,17 +99,18 @@ public class AmsCommonService {
         Map<String, Object> headers = new HashMap<>();
         headers.put(CXF_TRACE_HEADER, true);
         headers.put(HTTP_METHOD, "POST");
-        headers.put(HTTP_PATH, amsLoanRepaymentPath.replace("{accountNumber}", e.getProperty(ACCOUNT_NUMBER, String.class)));
+        headers.put(HTTP_PATH,
+                amsLocalProperties.loan().repaymentPath().replace("{accountNumber}", e.getProperty(ACCOUNT_NUMBER, String.class)));
         logger.debug("Loan Repayment Body: {}", e.getIn().getBody());
         headers.put("Content-Type", APPLICATION_TYPE);
         Map<String, Object> variables = e.getProperty("zeebeVariables", Map.class);
         String accountHoldingInstitutionId = (String) variables.get(ACCOUNT_HOLDING_INSTITUTION_ID);
         headers.putAll(tenantService.getHeaders(accountHoldingInstitutionId));
-        if (isAmsLocalEnabled) {
+        if (amsLocalProperties.enabled()) {
             cxfrsUtil.sendInOut("cxfrs:bean:ams.local.loan", e, headers, e.getIn().getBody());
         } else {
             logger.info("-------------- Calling Mock Loan repayment APIs --------------");
-            headers.put(HTTP_PATH, mockServiceLoanRepaymentPath);
+            headers.put(HTTP_PATH, mockServiceProperties.loan().repaymentPath());
             cxfrsUtil.sendInOut("cxfrs:bean:mock-service.local.loan", e, headers, e.getIn().getBody().toString());
         }
         // cxfrsUtil.sendInOut("cxfrs:bean:ams.local.loan", e, headers, e.getIn().getBody());
@@ -143,8 +129,7 @@ public class AmsCommonService {
                 return false;
             }
         } catch (Exception exception) {
-            logger.info("Callback failed!!!");
-            logger.debug(exception.getMessage());
+            logger.warn("Callback to {} failed", callbackURL, exception);
         }
         return false;
     }
@@ -153,8 +138,8 @@ public class AmsCommonService {
         Map<String, Object> headers = new HashMap<>();
         headers.put(CXF_TRACE_HEADER, true);
         headers.put(HTTP_METHOD, "POST");
-        headers.put(HTTP_PATH, amsInteropPartiesPath.replace("{idType}", e.getProperty(PARTY_ID_TYPE, String.class)).replace("{idValue}",
-                e.getProperty(PARTY_ID, String.class)));
+        headers.put(HTTP_PATH, amsLocalProperties.interop().partiesPath().replace("{idType}", e.getProperty(PARTY_ID_TYPE, String.class))
+                .replace("{idValue}", e.getProperty(PARTY_ID, String.class)));
         headers.put("Content-Type", "application/json");
         headers.putAll(tenantService.getHeaders(e.getProperty(TENANT_ID, String.class)));
         cxfrsUtil.sendInOut("cxfrs:bean:ams.local.interop", e, headers, e.getIn().getBody());
@@ -164,8 +149,8 @@ public class AmsCommonService {
         Map<String, Object> headers = new HashMap<>();
         headers.put(CXF_TRACE_HEADER, true);
         headers.put(HTTP_METHOD, "DELETE");
-        headers.put(HTTP_PATH, amsInteropPartiesPath.replace("{idType}", e.getProperty(PARTY_ID_TYPE, String.class)).replace("{idValue}",
-                e.getProperty(PARTY_ID, String.class)));
+        headers.put(HTTP_PATH, amsLocalProperties.interop().partiesPath().replace("{idType}", e.getProperty(PARTY_ID_TYPE, String.class))
+                .replace("{idValue}", e.getProperty(PARTY_ID, String.class)));
         headers.put("Content-Type", "application/json");
         headers.putAll(tenantService.getHeaders(e.getProperty(TENANT_ID, String.class)));
         e.getIn().setBody(null);

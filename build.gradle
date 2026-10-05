@@ -94,6 +94,10 @@ dependencies {
     checkstyle 'com.puppycrawl.tools:checkstyle:10.9.3'
     checkstyle 'com.github.sevntu-checkstyle:sevntu-checks:1.44.1'
     implementation 'org.springframework.boot:spring-boot-starter'
+    // Hibernate Validator, for the @NotNull on the @ConfigurationProperties records.
+    // Without a Bean Validation provider @Validated does not degrade quietly: every
+    // bind fails with NoProviderFoundException and the connector does not start.
+    implementation 'org.springframework.boot:spring-boot-starter-validation'
     implementation 'org.springframework.boot:spring-boot-starter-actuator'
     implementation 'org.springframework.boot:spring-boot-starter-web'
     implementation 'org.springframework.boot:spring-boot-starter-tomcat'

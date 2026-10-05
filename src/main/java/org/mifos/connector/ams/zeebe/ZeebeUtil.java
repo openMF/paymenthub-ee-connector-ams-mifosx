@@ -41,9 +41,20 @@ import org.springframework.stereotype.Component;
 public class ZeebeUtil {
 
     private static Logger logger = LoggerFactory.getLogger(ZeebeUtil.class);
-    private static ObjectMapper objectMapper = new ObjectMapper();
-    @Value("#{'${accountPrefixes}'.split(',')}")
-    public List<String> accountPrefixes;
+
+    /**
+     * The mapper configured in AmsConnectorApplication, not a fresh one. A private ObjectMapper here parsed and wrote
+     * the same JSON with different rules than the rest of the connector: it kept null fields that the configured mapper
+     * drops, and it failed on unknown properties where the configured mapper ignores them.
+     */
+    private final ObjectMapper objectMapper;
+
+    private final List<String> accountPrefixes;
+
+    public ZeebeUtil(ObjectMapper objectMapper, @Value("#{'${accountPrefixes}'.split(',')}") List<String> accountPrefixes) {
+        this.objectMapper = objectMapper;
+        this.accountPrefixes = accountPrefixes;
+    }
 
     public static void zeebeVariablesToCamelProperties(Map<String, Object> variables, Exchange exchange, String... names) {
         exchange.setProperty("zeebeVariables", variables);
@@ -62,7 +73,7 @@ public class ZeebeUtil {
         return exchange.getProperty("zeebeVariables", Map.class);
     }
 
-    public static <T> T zeebeVariable(Exchange exchange, String name, Class<T> clazz) throws Exception {
+    public <T> T zeebeVariable(Exchange exchange, String name, Class<T> clazz) throws Exception {
         Object content = zeebeVariablesFrom(exchange).get(name);
         if (content instanceof Map) {
             return objectMapper.readValue(objectMapper.writeValueAsString(content), clazz);
@@ -117,8 +128,8 @@ public class ZeebeUtil {
         variables.put("processType", "api");
     }
 
-    public static void setExchangePropertyLoan(Exchange ex, String partyId, String partyIdType,
-            TransactionChannelRequestDTO transactionRequest, Map<String, Object> existingVariables) throws JsonProcessingException {
+    public void setExchangePropertyLoan(Exchange ex, String partyId, String partyIdType, TransactionChannelRequestDTO transactionRequest,
+            Map<String, Object> existingVariables) throws JsonProcessingException {
         ex.setProperty(PARTY_ID_TYPE, partyIdType);
         ex.setProperty(PARTY_ID, partyId);
 
@@ -158,8 +169,7 @@ public class ZeebeUtil {
         return null;
     }
 
-    public static String convertGsmaTransfertoTransactionChannel(GsmaTransfer gsmaTransfer, Object property)
-            throws JsonProcessingException {
+    public String convertGsmaTransfertoTransactionChannel(GsmaTransfer gsmaTransfer, Object property) throws JsonProcessingException {
         TransactionChannelRequestDTO transactionChannelRequestDTO = new TransactionChannelRequestDTO();
         String msisdn = gsmaTransfer.getPayer().get(0).getPartyIdIdentifier();
         String accountId = property.toString();

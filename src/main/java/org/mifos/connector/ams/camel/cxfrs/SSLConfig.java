@@ -22,9 +22,9 @@ import org.apache.camel.support.jsse.KeyStoreParameters;
 import org.apache.camel.support.jsse.SSLContextParameters;
 import org.apache.camel.support.jsse.SSLContextServerParameters;
 import org.apache.camel.support.jsse.TrustManagersParameters;
+import org.mifos.connector.ams.properties.AmsLocalProperties;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.stereotype.Component;
 
@@ -37,12 +37,10 @@ public class SSLConfig {
     private File keyStoreFile;
     private boolean checkServerCert;
 
-    public SSLConfig(@Value("${ams.local.keystore-path}") String keystorePath,
-            @Value("${ams.local.keystore-password}") String keystorePassword,
-            @Value("${ams.local.server-cert-check}") boolean checkServerCert) {
-        this.keystorePassword = keystorePassword;
-        keyStoreFile = new FileSystemResource(keystorePath).getFile();
-        this.checkServerCert = checkServerCert;
+    public SSLConfig(AmsLocalProperties amsLocalProperties) {
+        this.keystorePassword = amsLocalProperties.keystorePassword();
+        keyStoreFile = new FileSystemResource(amsLocalProperties.keystorePath()).getFile();
+        this.checkServerCert = amsLocalProperties.serverCertCheck();
     }
 
     public SSLContextParameters provideSSLContextParameters() {
@@ -119,11 +117,11 @@ public class SSLConfig {
             return new TrustManager[0];
         }
 
-        InputStream trustStream = new FileInputStream(keyStoreFile);
         char[] trustPassword = keystorePassword.toCharArray();
-
         KeyStore trustStore = KeyStore.getInstance(KeyStore.getDefaultType());
-        trustStore.load(trustStream, trustPassword);
+        try (InputStream trustStream = new FileInputStream(keyStoreFile)) {
+            trustStore.load(trustStream, trustPassword);
+        }
 
         TrustManagerFactory trustFactory = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
         trustFactory.init(trustStore);

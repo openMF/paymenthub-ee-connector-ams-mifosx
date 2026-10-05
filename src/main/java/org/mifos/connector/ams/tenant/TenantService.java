@@ -15,13 +15,12 @@ import org.apache.camel.CamelContext;
 import org.apache.camel.Exchange;
 import org.apache.camel.ProducerTemplate;
 import org.apache.camel.support.DefaultExchange;
+import org.mifos.connector.ams.properties.AmsLocalProperties;
 import org.mifos.connector.ams.properties.Tenant;
 import org.mifos.connector.ams.properties.TenantProperties;
 import org.mifos.connector.common.ams.dto.LoginFineractCnResponseDTO;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -34,18 +33,23 @@ public class TenantService {
 
     private Logger logger = LoggerFactory.getLogger(this.getClass());
 
-    private ProducerTemplate producerTemplate;
+    private final ProducerTemplate producerTemplate;
 
-    @Autowired
-    private TenantProperties tenantProperties;
+    private final TenantProperties tenantProperties;
 
-    @Autowired
-    private CamelContext camelContext;
+    private final CamelContext camelContext;
 
-    @Value("${ams.local.version}")
-    private String amsLocalVersion;
+    private final String amsLocalVersion;
 
     private final Map<String, CachedTenantAuth> cachedTenantAuths = new ConcurrentHashMap<>();
+
+    public TenantService(ProducerTemplate producerTemplate, TenantProperties tenantProperties, CamelContext camelContext,
+            AmsLocalProperties amsLocalProperties) {
+        this.producerTemplate = producerTemplate;
+        this.tenantProperties = tenantProperties;
+        this.camelContext = camelContext;
+        this.amsLocalVersion = amsLocalProperties.version();
+    }
 
     public Map<String, Object> getHeaders(String tenantName) {
         logger.info("Getting headers for tenant: {}", tenantName);
@@ -90,7 +94,7 @@ public class TenantService {
             ex.setProperty(LOGIN_USERNAME, tenant.getUser());
             ex.setProperty(LOGIN_PASSWORD, tenant.getPassword());
             producerTemplate.send("direct:fincn-oauth", ex);
-            LoginFineractCnResponseDTO response = ex.getOut().getBody(LoginFineractCnResponseDTO.class);
+            LoginFineractCnResponseDTO response = ex.getMessage().getBody(LoginFineractCnResponseDTO.class);
             return new CachedTenantAuth(response.getAccessToken(), response.getAccessTokenExpiration());
         } else {
             throw new RuntimeException("Unsupported authType: " + tenantAuthtype + ", for local fsp version: " + amsLocalVersion

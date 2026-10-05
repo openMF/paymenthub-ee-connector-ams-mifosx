@@ -22,25 +22,12 @@ import org.apache.camel.component.cxf.common.message.CxfConstants;
 import org.mifos.connector.ams.camel.cxfrs.CxfrsUtil;
 import org.mifos.connector.ams.tenant.TenantService;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
 import org.springframework.stereotype.Component;
 
 @Component
 @ConditionalOnExpression("'${ams.local.version}'.equals('cn')")
 public class AmsFinCNService extends AmsCommonService implements AmsService {
-
-    @Value("${ams.local.account.instances-path}")
-    private String amsAccountInstancesPath;
-
-    @Value("${ams.local.account.definitons-path}")
-    private String amsAccountDefinitionsPath;
-
-    @Value("${ams.local.customer.path}")
-    private String amsLocalCustomerPath;
-
-    @Value("${ams.local.auth.path}")
-    private String amsLocalAuthPath;
 
     @Autowired
     private TenantService tenantService;
@@ -52,7 +39,8 @@ public class AmsFinCNService extends AmsCommonService implements AmsService {
         Map<String, Object> headers = new HashMap<>();
         headers.put(CXF_TRACE_HEADER, true);
         headers.put(HTTP_METHOD, "GET");
-        headers.put(HTTP_PATH, amsAccountInstancesPath.replace("{accountId}", e.getProperty(ACCOUNT_ID, String.class)));
+        headers.put(HTTP_PATH,
+                amsLocalProperties.account().instancesPath().replace("{accountId}", e.getProperty(ACCOUNT_ID, String.class)));
         headers.putAll(tenantService.getHeaders(e.getProperty(TENANT_ID, String.class)));
         cxfrsUtil.sendInOut("cxfrs:bean:ams.local.account", e, headers, null);
     }
@@ -61,7 +49,8 @@ public class AmsFinCNService extends AmsCommonService implements AmsService {
         Map<String, Object> headers = new HashMap<>();
         headers.put(CXF_TRACE_HEADER, true);
         headers.put(HTTP_METHOD, "GET");
-        headers.put(HTTP_PATH, amsAccountDefinitionsPath.replace("{definitionId}", e.getProperty(DEFINITON_ID, String.class)));
+        headers.put(HTTP_PATH,
+                amsLocalProperties.account().definitonsPath().replace("{definitionId}", e.getProperty(DEFINITON_ID, String.class)));
         headers.putAll(tenantService.getHeaders(e.getProperty(TENANT_ID, String.class)));
         cxfrsUtil.sendInOut("cxfrs:bean:ams.local.account", e, headers, null);
     }
@@ -74,7 +63,8 @@ public class AmsFinCNService extends AmsCommonService implements AmsService {
         Map<String, Object> headers = new HashMap<>();
         headers.put(CXF_TRACE_HEADER, true);
         headers.put(HTTP_METHOD, "GET");
-        headers.put(HTTP_PATH, amsLocalCustomerPath.replace("{customerIdentifier}", e.getProperty(CLIENT_ID, String.class)));
+        headers.put(HTTP_PATH,
+                amsLocalProperties.customer().path().replace("{customerIdentifier}", e.getProperty(CLIENT_ID, String.class)));
         headers.putAll(tenantService.getHeaders(e.getProperty(TENANT_ID, String.class)));
         cxfrsUtil.sendInOut("cxfrs:bean:ams.local.customer", e, headers, null);
     }
@@ -83,7 +73,8 @@ public class AmsFinCNService extends AmsCommonService implements AmsService {
         Map<String, Object> headers = new HashMap<>();
         headers.put(CXF_TRACE_HEADER, true);
         headers.put(HTTP_METHOD, "GET");
-        headers.put(HTTP_PATH, amsLocalCustomerPath.replace("{customerIdentifier}", e.getProperty(IDENTIFIER_ID, String.class)));
+        headers.put(HTTP_PATH,
+                amsLocalProperties.customer().path().replace("{customerIdentifier}", e.getProperty(IDENTIFIER_ID, String.class)));
         headers.putAll(tenantService.getHeaders(e.getProperty(TENANT_ID, String.class)));
         cxfrsUtil.sendInOut("cxfrs:bean:ams.local.customer", e, headers, null);
     }
@@ -92,7 +83,7 @@ public class AmsFinCNService extends AmsCommonService implements AmsService {
         Map<String, Object> headers = new HashMap<>();
         headers.put(CXF_TRACE_HEADER, true);
         headers.put(HTTP_METHOD, "POST");
-        headers.put(HTTP_PATH, amsLocalAuthPath);
+        headers.put(HTTP_PATH, amsLocalProperties.auth().path());
         headers.put(X_TENANT_IDENTIFIER_HEADER, e.getProperty(TENANT_ID));
         headers.put("Content-Type", "application/x-www-form-urlencoded");
 

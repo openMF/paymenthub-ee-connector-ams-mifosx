@@ -1,7 +1,6 @@
 package org.mifos.connector.ams.interop;
 
 import static org.mifos.connector.ams.camel.config.CamelProperties.TRANSACTION_ROLE;
-import static org.mifos.connector.ams.zeebe.ZeebeUtil.zeebeVariable;
 import static org.mifos.connector.ams.zeebe.ZeebeVariables.BOOK_TRANSACTION_ID;
 import static org.mifos.connector.ams.zeebe.ZeebeVariables.EXTERNAL_ACCOUNT_ID;
 import static org.mifos.connector.ams.zeebe.ZeebeVariables.NOTE;
@@ -12,6 +11,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.UUID;
 import org.apache.camel.Exchange;
 import org.apache.camel.Processor;
+import org.mifos.connector.ams.zeebe.ZeebeUtil;
 import org.mifos.connector.common.ams.dto.TransferFspRequestDTO;
 import org.mifos.connector.common.mojaloop.dto.FspMoneyData;
 import org.mifos.connector.common.mojaloop.dto.TransactionType;
@@ -32,11 +32,14 @@ public class PrepareTransferRequest implements Processor {
     @Autowired
     private ObjectMapper objectMapper;
 
+    @Autowired
+    private ZeebeUtil zeebeUtil;
+
     @Override
     public void process(Exchange exchange) throws Exception {
-        String initiator = zeebeVariable(exchange, "initiator", String.class);
-        String initiatorType = zeebeVariable(exchange, "initiatorType", String.class);
-        String scenario = zeebeVariable(exchange, "scenario", String.class);
+        String initiator = zeebeUtil.zeebeVariable(exchange, "initiator", String.class);
+        String initiatorType = zeebeUtil.zeebeVariable(exchange, "initiatorType", String.class);
+        String scenario = zeebeUtil.zeebeVariable(exchange, "scenario", String.class);
 
         logger.info("Preparing transfer request for initiator: {}, initiatorType: {}, scenario: {}", initiator, initiatorType, scenario);
 
@@ -45,10 +48,10 @@ public class PrepareTransferRequest implements Processor {
         transactionType.setInitiatorType(InitiatorType.valueOf(initiatorType));
         transactionType.setScenario(Scenario.valueOf(scenario));
 
-        String note = zeebeVariable(exchange, NOTE, String.class);
-        FspMoneyData amount = zeebeVariable(exchange, "amount", FspMoneyData.class);
-        FspMoneyData fspFee = zeebeVariable(exchange, "fspFee", FspMoneyData.class);
-        FspMoneyData fspCommission = zeebeVariable(exchange, "fspCommission", FspMoneyData.class);
+        String note = zeebeUtil.zeebeVariable(exchange, NOTE, String.class);
+        FspMoneyData amount = zeebeUtil.zeebeVariable(exchange, "amount", FspMoneyData.class);
+        FspMoneyData fspFee = zeebeUtil.zeebeVariable(exchange, "fspFee", FspMoneyData.class);
+        FspMoneyData fspCommission = zeebeUtil.zeebeVariable(exchange, "fspCommission", FspMoneyData.class);
 
         String existingTransferCode = exchange.getProperty(TRANSFER_CODE, String.class);
         String transferCode;

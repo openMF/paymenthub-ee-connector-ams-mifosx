@@ -2,7 +2,7 @@ package org.mifos.connector.ams.zeebe;
 
 import io.camunda.zeebe.client.ZeebeClient;
 import java.time.Duration;
-import org.springframework.beans.factory.annotation.Value;
+import org.mifos.connector.ams.properties.ZeebeProperties;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -11,19 +11,16 @@ import org.springframework.context.annotation.Configuration;
 @ConditionalOnExpression("${zeebe.enabled:true}")
 public class ZeebeClientConfiguration {
 
-    @Value("${zeebe.broker.contactpoint}")
-    private String zeebeBrokerContactpoint;
+    private final ZeebeProperties zeebeProperties;
 
-    @Value("${zeebe.client.max-execution-threads}")
-    private int zeebeClientMaxThreads;
-
-    @Value("${zeebe.client.poll-interval}")
-    private int zeebeClientPollInterval;
+    public ZeebeClientConfiguration(ZeebeProperties zeebeProperties) {
+        this.zeebeProperties = zeebeProperties;
+    }
 
     @Bean
     public ZeebeClient setup() {
-        return ZeebeClient.newClientBuilder().gatewayAddress(zeebeBrokerContactpoint).usePlaintext()
-                .defaultJobPollInterval(Duration.ofMillis(zeebeClientPollInterval)).defaultJobWorkerMaxJobsActive(2000)
-                .numJobWorkerExecutionThreads(zeebeClientMaxThreads).build();
+        return ZeebeClient.newClientBuilder().gatewayAddress(zeebeProperties.broker().contactpoint()).usePlaintext()
+                .defaultJobPollInterval(Duration.ofMillis(zeebeProperties.client().pollInterval())).defaultJobWorkerMaxJobsActive(2000)
+                .numJobWorkerExecutionThreads(zeebeProperties.client().maxExecutionThreads()).build();
     }
 }

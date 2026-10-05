@@ -45,6 +45,7 @@ import org.apache.camel.Processor;
 import org.apache.camel.model.dataformat.JsonLibrary;
 import org.json.JSONObject;
 import org.mifos.connector.ams.errorhandler.ErrorTranslator;
+import org.mifos.connector.ams.properties.AmsLocalProperties;
 import org.mifos.connector.ams.tenant.TenantNotExistException;
 import org.mifos.connector.ams.utils.Utils;
 import org.mifos.connector.ams.zeebe.ZeebeUtil;
@@ -66,15 +67,14 @@ import org.mifos.connector.common.mojaloop.type.TransactionRole;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 @Component
 // @ConditionalOnExpression("${ams.local.enabled}")
 public class InteroperationRouteBuilder extends ErrorHandlerRouteBuilder {
 
-    @Value("${ams.local.version}")
-    private String amsVersion;
+    @Autowired
+    private AmsLocalProperties amsLocalProperties;
 
     @Autowired
     private Processor pojoToString;
@@ -247,7 +247,7 @@ public class InteroperationRouteBuilder extends ErrorHandlerRouteBuilder {
                 .otherwise()
                 .process(amsService::getSavingsAccount)
                 .choice()
-                    .when(e -> "1.2".equals(amsVersion))
+                    .when(e -> "1.2".equals(amsLocalProperties.version()))
                         .unmarshal().json(JsonLibrary.Jackson, InteropAccountDTO.class)
                         .process(e -> e.setProperty(CLIENT_ID, e.getIn().getBody(InteropAccountDTO.class).getClientId()))
                         .process(amsService::getClient)
@@ -268,7 +268,7 @@ public class InteroperationRouteBuilder extends ErrorHandlerRouteBuilder {
                 .id("register-party")
                 .log(LoggingLevel.INFO, "Register party with type: ${exchangeProperty." + PARTY_ID_TYPE + "} identifier: ${exchangeProperty." + PARTY_ID + "} account ${exchangeProperty." + ACCOUNT + "}")
                 .choice()
-                    .when(e -> "1.2".equals(amsVersion))
+                    .when(e -> "1.2".equals(amsLocalProperties.version()))
                         .to("direct:register-party-finx")
                     .endChoice()
                     .otherwise()
