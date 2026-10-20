@@ -467,30 +467,31 @@ public class ZeebeeWorkers {
 
                     zeebeClient.newCompleteCommand(job.getKey()).variables(variables).send();
                 }).name(WORKER_ACCOUNT_IDENTIFIER + dfspid).maxJobsActive(workerMaxJobs).open();
-
-                logger.info("## generating {} worker", WORKER_SEND_CALLBACK);
-                zeebeClient.newWorker().jobType(WORKER_SEND_CALLBACK).handler((client, job) -> {
-                    logWorkerDetails(job);
-                    Map<String, Object> existingVariables = job.getVariablesAsMap();
-                    logger.debug("Exisiting variables {}", existingVariables);
-                    Exchange ex = new DefaultExchange(camelContext);
-                    Map<String, Object> variables = job.getVariablesAsMap();
-
-                    ex.setProperty(X_CALLBACKURL, existingVariables.get(X_CALLBACKURL));
-                    ex.setProperty(FINERACT_RESPONSE_BODY, existingVariables.get(FINERACT_RESPONSE_BODY));
-                    producerTemplate.send("direct:send-callback", ex);
-                    // callbackSent is unset when the route failed, e.g. no X-CallbackURL; report it like a failed
-                    // callback
-                    Object callbackSent = ex.getProperty("callbackSent");
-                    if (callbackSent == null) {
-                        logger.error("send-callback failed for job {}: {}", job.getKey(),
-                                ex.getException() != null ? ex.getException().getMessage() : "no callbackSent result");
-                    }
-                    variables.put(CALLBACK_SUCCESS, String.valueOf(Boolean.TRUE.equals(callbackSent)));
-                    zeebeClient.newCompleteCommand(job.getKey()).variables(variables).send();
-
-                }).name(WORKER_SEND_CALLBACK).maxJobsActive(workerMaxJobs).open();
             }
+
+            // job type has no DFSP suffix, so register it once, not once per DFSP
+            logger.info("## generating {} worker", WORKER_SEND_CALLBACK);
+            zeebeClient.newWorker().jobType(WORKER_SEND_CALLBACK).handler((client, job) -> {
+                logWorkerDetails(job);
+                Map<String, Object> existingVariables = job.getVariablesAsMap();
+                logger.debug("Exisiting variables {}", existingVariables);
+                Exchange ex = new DefaultExchange(camelContext);
+                Map<String, Object> variables = job.getVariablesAsMap();
+
+                ex.setProperty(X_CALLBACKURL, existingVariables.get(X_CALLBACKURL));
+                ex.setProperty(FINERACT_RESPONSE_BODY, existingVariables.get(FINERACT_RESPONSE_BODY));
+                producerTemplate.send("direct:send-callback", ex);
+                // callbackSent is unset when the route failed, e.g. no X-CallbackURL; report it like a failed
+                // callback
+                Object callbackSent = ex.getProperty("callbackSent");
+                if (callbackSent == null) {
+                    logger.error("send-callback failed for job {}: {}", job.getKey(),
+                            ex.getException() != null ? ex.getException().getMessage() : "no callbackSent result");
+                }
+                variables.put(CALLBACK_SUCCESS, String.valueOf(Boolean.TRUE.equals(callbackSent)));
+                zeebeClient.newCompleteCommand(job.getKey()).variables(variables).send();
+
+            }).name(WORKER_SEND_CALLBACK).maxJobsActive(workerMaxJobs).open();
         }
     }
 
