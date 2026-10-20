@@ -36,6 +36,7 @@ import static org.mifos.connector.common.ams.dto.TransferActionType.RELEASE;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.camunda.zeebe.client.ZeebeClient;
 import io.camunda.zeebe.client.api.response.ActivatedJob;
+import io.camunda.zeebe.client.api.worker.JobClient;
 import jakarta.annotation.PostConstruct;
 import java.math.BigDecimal;
 import java.util.HashMap;
@@ -401,9 +402,8 @@ public class ZeebeeWorkers {
                     ex.setProperty(CHANNEL_REQUEST, objectMapper.writeValueAsString(transactionRequest));
                     ex.setProperty(TRANSACTION_ROLE, TransactionRole.PAYEE.name());
                     producerTemplate.send("direct:send-transfers", ex);
-                    variables.put("transferCreateFailed", false);
-                    variables.put("payeeTenantId", existingVariables.get("payeeTenantId"));
-                    zeebeClient.newCompleteCommand(job.getKey()).variables(variables).send();
+                    // the route completes the job (transfersResponseProcessor) with the real transferCreateFailed
+                    failJobIfRouteFailed(client, job, ex);
                 }).name(WORKER_PAYEE_DEPOSIT_TRANSFER + dfspid).maxJobsActive(workerMaxJobs).open();
 
                 logger.info("## generating {}" + "{} worker", WORKER_PAYEE_LOAN_TRANSFER, dfspid);
@@ -432,9 +432,8 @@ public class ZeebeeWorkers {
                     zeebeUtil.setExchangePropertyLoan(ex, partyId, partyIdType, transactionRequest, existingVariables);
 
                     producerTemplate.send("direct:send-transfers-loan", ex);
-                    variables.put("transferCreateFailed", false);
-                    variables.put("payeeTenantId", existingVariables.get("payeeTenantId"));
-                    zeebeClient.newCompleteCommand(job.getKey()).variables(variables).send();
+                    // the route completes the job with the real transferCreateFailed
+                    failJobIfRouteFailed(client, job, ex);
                 }).name(WORKER_PAYEE_LOAN_TRANSFER + dfspid).maxJobsActive(workerMaxJobs).open();
 
                 logger.info("## generating " + WORKER_ACCOUNT_IDENTIFIER + "{} worker", dfspid);
@@ -476,6 +475,20 @@ public class ZeebeeWorkers {
 
                 }).name(WORKER_SEND_CALLBACK).maxJobsActive(workerMaxJobs).open();
             }
+        }
+    }
+
+    /**
+     * producerTemplate.send does not throw: if the route failed before completing the job, the exception is on the
+     * exchange. Fail the job with that message so Zeebe retries it (and raises a readable incident when retries run
+     * out) instead of waiting for the job timeout.
+     */
+    private void failJobIfRouteFailed(JobClient client, ActivatedJob job, Exchange ex) {
+        Exception exception = ex.getException();
+        if (exception != null) {
+            logger.error("Route failed for job {} ({})", job.getKey(), job.getType(), exception);
+            client.newFailCommand(job.getKey()).retries(Math.max(job.getRetries() - 1, 0))
+                    .errorMessage(String.valueOf(exception.getMessage())).send();
         }
     }
 
