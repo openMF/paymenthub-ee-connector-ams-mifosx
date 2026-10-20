@@ -422,7 +422,9 @@ public class ZeebeeWorkers {
                     String accountHoldingInstitutionId = (String) existingVariables.get(ACCOUNT_HOLDING_INSTITUTION_ID);
                     Exchange ex = new DefaultExchange(camelContext);
                     Map<String, Object> variables = job.getVariablesAsMap();
-                    zeebeVariablesToCamelProperties(variables, ex, TRANSACTION_ID, accountHoldingInstitutionId, CHANNEL_REQUEST);
+                    zeebeVariablesToCamelProperties(variables, ex, TRANSACTION_ID, ACCOUNT_HOLDING_INSTITUTION_ID, CHANNEL_REQUEST);
+                    // the account-holding institution is the tenant the loan repayment is booked in
+                    ex.setProperty(TENANT_ID, accountHoldingInstitutionId);
 
                     ex.setProperty(TRANSFER_ACTION, CREATE.name());
                     ex.setProperty("payeeTenantId", existingVariables.get("payeeTenantId"));
