@@ -304,7 +304,14 @@ public class ZeebeeWorkers {
                         ex.setProperty(PARTY_ID_TYPE, partyIdType);
                         ex.setProperty(PARTY_ID, partyId);
                         ex.setProperty(ZEEBE_JOB_KEY, job.getKey());
-                        if (dfspid.equalsIgnoreCase(existingVariables.get("payeeTenantId").toString())) {
+                        Object payeeTenantId = existingVariables.get("payeeTenantId");
+                        if (payeeTenantId == null) {
+                            // retrying cannot supply a missing variable: raise an incident that names it
+                            logger.error("Job {} ({}) has no payeeTenantId variable", job.getKey(), job.getType());
+                            client.newFailCommand(job.getKey()).retries(0).errorMessage("Missing job variable payeeTenantId").send();
+                            return;
+                        }
+                        if (dfspid.equalsIgnoreCase(payeeTenantId.toString())) {
                             ex.setProperty(TENANT_ID, existingVariables.get("payeeTenantId"));
                         } else {
                             ex.setProperty(TENANT_ID, tenantId);
@@ -470,7 +477,14 @@ public class ZeebeeWorkers {
                     ex.setProperty(X_CALLBACKURL, existingVariables.get(X_CALLBACKURL));
                     ex.setProperty(FINERACT_RESPONSE_BODY, existingVariables.get(FINERACT_RESPONSE_BODY));
                     producerTemplate.send("direct:send-callback", ex);
-                    variables.put(CALLBACK_SUCCESS, ex.getProperty("callbackSent").toString());
+                    // callbackSent is unset when the route failed, e.g. no X-CallbackURL; report it like a failed
+                    // callback
+                    Object callbackSent = ex.getProperty("callbackSent");
+                    if (callbackSent == null) {
+                        logger.error("send-callback failed for job {}: {}", job.getKey(),
+                                ex.getException() != null ? ex.getException().getMessage() : "no callbackSent result");
+                    }
+                    variables.put(CALLBACK_SUCCESS, String.valueOf(Boolean.TRUE.equals(callbackSent)));
                     zeebeClient.newCompleteCommand(job.getKey()).variables(variables).send();
 
                 }).name(WORKER_SEND_CALLBACK).maxJobsActive(workerMaxJobs).open();
