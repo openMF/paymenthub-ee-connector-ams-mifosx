@@ -36,6 +36,7 @@ import static org.mifos.connector.common.ams.dto.TransferActionType.RELEASE;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.camunda.zeebe.client.ZeebeClient;
 import io.camunda.zeebe.client.api.response.ActivatedJob;
+import io.camunda.zeebe.client.api.worker.JobClient;
 import jakarta.annotation.PostConstruct;
 import java.math.BigDecimal;
 import java.util.HashMap;
@@ -303,7 +304,14 @@ public class ZeebeeWorkers {
                         ex.setProperty(PARTY_ID_TYPE, partyIdType);
                         ex.setProperty(PARTY_ID, partyId);
                         ex.setProperty(ZEEBE_JOB_KEY, job.getKey());
-                        if (dfspid.equalsIgnoreCase(existingVariables.get("payeeTenantId").toString())) {
+                        Object payeeTenantId = existingVariables.get("payeeTenantId");
+                        if (payeeTenantId == null) {
+                            // retrying cannot supply a missing variable: raise an incident that names it
+                            logger.error("Job {} ({}) has no payeeTenantId variable", job.getKey(), job.getType());
+                            client.newFailCommand(job.getKey()).retries(0).errorMessage("Missing job variable payeeTenantId").send();
+                            return;
+                        }
+                        if (dfspid.equalsIgnoreCase(payeeTenantId.toString())) {
                             ex.setProperty(TENANT_ID, existingVariables.get("payeeTenantId"));
                         } else {
                             ex.setProperty(TENANT_ID, tenantId);
@@ -401,9 +409,8 @@ public class ZeebeeWorkers {
                     ex.setProperty(CHANNEL_REQUEST, objectMapper.writeValueAsString(transactionRequest));
                     ex.setProperty(TRANSACTION_ROLE, TransactionRole.PAYEE.name());
                     producerTemplate.send("direct:send-transfers", ex);
-                    variables.put("transferCreateFailed", false);
-                    variables.put("payeeTenantId", existingVariables.get("payeeTenantId"));
-                    zeebeClient.newCompleteCommand(job.getKey()).variables(variables).send();
+                    // the route completes the job (transfersResponseProcessor) with the real transferCreateFailed
+                    failJobIfRouteFailed(client, job, ex);
                 }).name(WORKER_PAYEE_DEPOSIT_TRANSFER + dfspid).maxJobsActive(workerMaxJobs).open();
 
                 logger.info("## generating {}" + "{} worker", WORKER_PAYEE_LOAN_TRANSFER, dfspid);
@@ -415,7 +422,9 @@ public class ZeebeeWorkers {
                     String accountHoldingInstitutionId = (String) existingVariables.get(ACCOUNT_HOLDING_INSTITUTION_ID);
                     Exchange ex = new DefaultExchange(camelContext);
                     Map<String, Object> variables = job.getVariablesAsMap();
-                    zeebeVariablesToCamelProperties(variables, ex, TRANSACTION_ID, accountHoldingInstitutionId, CHANNEL_REQUEST);
+                    zeebeVariablesToCamelProperties(variables, ex, TRANSACTION_ID, ACCOUNT_HOLDING_INSTITUTION_ID, CHANNEL_REQUEST);
+                    // the account-holding institution is the tenant the loan repayment is booked in
+                    ex.setProperty(TENANT_ID, accountHoldingInstitutionId);
 
                     ex.setProperty(TRANSFER_ACTION, CREATE.name());
                     ex.setProperty("payeeTenantId", existingVariables.get("payeeTenantId"));
@@ -432,9 +441,8 @@ public class ZeebeeWorkers {
                     zeebeUtil.setExchangePropertyLoan(ex, partyId, partyIdType, transactionRequest, existingVariables);
 
                     producerTemplate.send("direct:send-transfers-loan", ex);
-                    variables.put("transferCreateFailed", false);
-                    variables.put("payeeTenantId", existingVariables.get("payeeTenantId"));
-                    zeebeClient.newCompleteCommand(job.getKey()).variables(variables).send();
+                    // the route completes the job with the real transferCreateFailed
+                    failJobIfRouteFailed(client, job, ex);
                 }).name(WORKER_PAYEE_LOAN_TRANSFER + dfspid).maxJobsActive(workerMaxJobs).open();
 
                 logger.info("## generating " + WORKER_ACCOUNT_IDENTIFIER + "{} worker", dfspid);
@@ -459,23 +467,45 @@ public class ZeebeeWorkers {
 
                     zeebeClient.newCompleteCommand(job.getKey()).variables(variables).send();
                 }).name(WORKER_ACCOUNT_IDENTIFIER + dfspid).maxJobsActive(workerMaxJobs).open();
-
-                logger.info("## generating {} worker", WORKER_SEND_CALLBACK);
-                zeebeClient.newWorker().jobType(WORKER_SEND_CALLBACK).handler((client, job) -> {
-                    logWorkerDetails(job);
-                    Map<String, Object> existingVariables = job.getVariablesAsMap();
-                    logger.debug("Exisiting variables {}", existingVariables);
-                    Exchange ex = new DefaultExchange(camelContext);
-                    Map<String, Object> variables = job.getVariablesAsMap();
-
-                    ex.setProperty(X_CALLBACKURL, existingVariables.get(X_CALLBACKURL));
-                    ex.setProperty(FINERACT_RESPONSE_BODY, existingVariables.get(FINERACT_RESPONSE_BODY));
-                    producerTemplate.send("direct:send-callback", ex);
-                    variables.put(CALLBACK_SUCCESS, ex.getProperty("callbackSent").toString());
-                    zeebeClient.newCompleteCommand(job.getKey()).variables(variables).send();
-
-                }).name(WORKER_SEND_CALLBACK).maxJobsActive(workerMaxJobs).open();
             }
+
+            // job type has no DFSP suffix, so register it once, not once per DFSP
+            logger.info("## generating {} worker", WORKER_SEND_CALLBACK);
+            zeebeClient.newWorker().jobType(WORKER_SEND_CALLBACK).handler((client, job) -> {
+                logWorkerDetails(job);
+                Map<String, Object> existingVariables = job.getVariablesAsMap();
+                logger.debug("Exisiting variables {}", existingVariables);
+                Exchange ex = new DefaultExchange(camelContext);
+                Map<String, Object> variables = job.getVariablesAsMap();
+
+                ex.setProperty(X_CALLBACKURL, existingVariables.get(X_CALLBACKURL));
+                ex.setProperty(FINERACT_RESPONSE_BODY, existingVariables.get(FINERACT_RESPONSE_BODY));
+                producerTemplate.send("direct:send-callback", ex);
+                // callbackSent is unset when the route failed, e.g. no X-CallbackURL; report it like a failed
+                // callback
+                Object callbackSent = ex.getProperty("callbackSent");
+                if (callbackSent == null) {
+                    logger.error("send-callback failed for job {}: {}", job.getKey(),
+                            ex.getException() != null ? ex.getException().getMessage() : "no callbackSent result");
+                }
+                variables.put(CALLBACK_SUCCESS, String.valueOf(Boolean.TRUE.equals(callbackSent)));
+                zeebeClient.newCompleteCommand(job.getKey()).variables(variables).send();
+
+            }).name(WORKER_SEND_CALLBACK).maxJobsActive(workerMaxJobs).open();
+        }
+    }
+
+    /**
+     * producerTemplate.send does not throw: if the route failed before completing the job, the exception is on the
+     * exchange. Fail the job with that message so Zeebe retries it (and raises a readable incident when retries run
+     * out) instead of waiting for the job timeout.
+     */
+    private void failJobIfRouteFailed(JobClient client, ActivatedJob job, Exchange ex) {
+        Exception exception = ex.getException();
+        if (exception != null) {
+            logger.error("Route failed for job {} ({})", job.getKey(), job.getType(), exception);
+            client.newFailCommand(job.getKey()).retries(Math.max(job.getRetries() - 1, 0))
+                    .errorMessage(String.valueOf(exception.getMessage())).send();
         }
     }
 

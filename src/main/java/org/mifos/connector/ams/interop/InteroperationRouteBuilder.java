@@ -110,8 +110,6 @@ public class InteroperationRouteBuilder extends ErrorHandlerRouteBuilder {
     private ErrorTranslator errorTranslator;
 
     private Logger logger = LoggerFactory.getLogger(this.getClass());
-    private String callbackUrl;
-    private String fineractResponseBody;
 
     public InteroperationRouteBuilder() {
         super.configure();
@@ -380,11 +378,12 @@ public class InteroperationRouteBuilder extends ErrorHandlerRouteBuilder {
                         "Sending callback with action: ${exchangeProperty." + TRANSFER_ACTION + "} "
                                 + " for transaction: ${exchangeProperty." + TRANSACTION_ID + "}")
                 .log("Process type: ${exchangeProperty." + PROCESS_TYPE + "}").process(exchange -> {
-                    if (exchange.getProperties().containsKey(FINERACT_RESPONSE_BODY)) {
-                        fineractResponseBody = exchange.getProperty(FINERACT_RESPONSE_BODY).toString();
-                    }
-                    callbackUrl = exchange.getProperty(X_CALLBACKURL).toString();
-                    boolean callbackSent = amsService.sendCallback(callbackUrl, fineractResponseBody);
+                    // per exchange: these used to be fields on this singleton, so a callback without a response body
+                    // was sent the previous transaction's body
+                    Object fineractResponseBody = exchange.getProperty(FINERACT_RESPONSE_BODY);
+                    String callbackUrl = exchange.getProperty(X_CALLBACKURL).toString();
+                    boolean callbackSent = amsService.sendCallback(callbackUrl,
+                            fineractResponseBody != null ? fineractResponseBody.toString() : null);
                     exchange.setProperty("callbackSent", callbackSent);
                 });
     }
