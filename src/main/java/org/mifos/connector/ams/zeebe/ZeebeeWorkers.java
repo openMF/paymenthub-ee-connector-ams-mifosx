@@ -325,7 +325,7 @@ public class ZeebeeWorkers {
                          *
                          * a = payer tenant b = payee tenant
                          *
-                         * debit -> gorilla credit -> gorilla
+                         * debit -> greenbank credit -> greenbank
                          *
                          * PLATFORM-TENANT-ID -> PAYER/PAYEE
                          */
